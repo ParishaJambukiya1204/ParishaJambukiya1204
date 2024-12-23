@@ -1,0 +1,289 @@
+﻿using System;
+using System.Collections.Generic;
+using System.ComponentModel;
+using System.Drawing;
+using System.Data;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+using System.Windows.Forms;
+using System.Data.SqlClient;
+using System.IO;
+
+namespace WindowsFormsApplication1
+{
+    public partial class AddBooks : UserControl
+    {
+        SqlConnection connect = new SqlConnection(@"Data Source=(LocalDB)\MSSQLLocalDB;AttachDbFilename=C:\2252\WindowsFormsApplication1\lms.mdf;Integrated Security=True;Connect Timeout=30");
+        public AddBooks()
+        {
+            InitializeComponent();
+            displayBooks();
+        }
+
+
+        public void refreshData()
+        {
+            if (InvokeRequired)
+            {
+                Invoke((MethodInvoker)refreshData);
+                return;
+            }
+            displayBooks();
+        }
+
+
+        private void importbtn_Click(object sender, EventArgs e)
+        {
+            String imagePath = "";
+            try
+            {
+                OpenFileDialog dialog = new OpenFileDialog();
+                dialog.Filter = "Image Files(*.jpg; *.png) | *.jpg; *.png";
+                if (dialog.ShowDialog() == DialogResult.OK)
+                {
+                    imagePath = dialog.FileName;
+                    addbooks_picture.ImageLocation = imagePath;
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Error:" + ex, "Error Message", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+
+
+        private void addBooksbtn_Click(object sender, EventArgs e)
+        {
+            if (addbooks_picture.Image == null
+        || addBooks_bookTitle.Text == ""
+        || addBooks_author.Text == ""
+        || addBooks_published.Value == null
+        || addBooks_status.Text == "")
+            {
+                MessageBox.Show("Please fill all the blank fields", "Error Message", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+            else
+            {
+                if (connect.State == ConnectionState.Closed)
+                {
+                    try
+                    {
+                        DateTime today = DateTime.Today;
+                        connect.Open();
+
+                        // Prepare the file path
+                        string fileName = $"{addBooks_bookTitle.Text.Trim()}_{addBooks_author.Text.Trim()}_{today:yyyyMMdd}.jpg";
+                        string directoryPath = Path.Combine(@"C:\2252\WindowsFormsApplication1\WindowsFormsApplication1\Books_Directory\");
+                        string path = Path.Combine(directoryPath, fileName);
+
+                        // Ensure the directory exists
+                        if (!Directory.Exists(directoryPath))
+                        {
+                            Directory.CreateDirectory(directoryPath);
+                        }
+
+                        // Copy the image file
+                        File.Copy(addbooks_picture.ImageLocation, path, true);
+
+                        // SQL insert command
+                        string insertData = "INSERT INTO books (book_title, author, published_date, status, image, date_insert) VALUES (@bookTitle, @author, @published_date, @status, @image, @dateInsert)";
+
+                        using (SqlCommand cmd = new SqlCommand(insertData, connect))
+                        {
+                            cmd.Parameters.AddWithValue("@bookTitle", addBooks_bookTitle.Text.Trim());
+                            cmd.Parameters.AddWithValue("@author", addBooks_author.Text.Trim());
+                            cmd.Parameters.AddWithValue("@published_date", addBooks_published.Value.ToString("yyyy-MM-dd")); // Format date appropriately
+                            cmd.Parameters.AddWithValue("@status", addBooks_status.Text.Trim());
+                            cmd.Parameters.AddWithValue("@image", path); // Store the new file path
+                            cmd.Parameters.AddWithValue("@dateInsert", today);
+
+                            cmd.ExecuteNonQuery();
+
+                            MessageBox.Show("Data Added Successfully", "Information Message", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                            displayBooks();
+                            clearFields();
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        MessageBox.Show("Error: " + ex.Message, "Error Message", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    }
+                    finally
+                    {
+                        connect.Close();
+                    }
+                }
+            }
+        }
+
+        public void clearFields()
+        {
+            addBooks_bookTitle.Text = "";
+            addBooks_author.Text = "";
+            addbooks_picture.Image = null;
+            addBooks_status.SelectedIndex = -1;
+        }
+
+        public void displayBooks()
+        {
+        DataAddBooks dab = new DataAddBooks();
+        List<DataAddBooks> listData = dab.addBooksData();
+        dataGridView1.DataSource = listData;
+        dataGridView1.Refresh();
+        }
+
+    private int  bookID = 0;
+
+
+
+        private void updateBooksbtn_Click(object sender, EventArgs e)
+        {
+
+         if (addbooks_picture.Image == null
+        || addBooks_bookTitle.Text == ""
+        || addBooks_author.Text == ""
+        || addBooks_published.Value == null
+        || addBooks_status.Text == "")
+            {
+                MessageBox.Show("Please fill all the blank fields", "Error Message", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return;
+            }
+
+            if (connect.State != ConnectionState.Open)
+            {
+                DialogResult check = MessageBox.Show("Are you sure you want to update book id:" + bookID + "?", "Confirmation Message", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+                if (check == DialogResult.Yes)
+                {
+                    try
+                    {
+                        connect.Open();
+                        DateTime today = DateTime.Today;
+
+                        // Ensure the column names are correct
+                        string updateData = "UPDATE books SET book_title = @bookTitle, author = @author, published_date = @published_date, status = @status, date_update = @dateUpdate WHERE id = @id";
+
+                        using (SqlCommand cmd = new SqlCommand(updateData, connect))
+                        {
+                            cmd.Parameters.AddWithValue("@bookTitle", addBooks_bookTitle.Text.Trim());
+                            cmd.Parameters.AddWithValue("@author", addBooks_author.Text.Trim());
+                            cmd.Parameters.AddWithValue("@published_date", addBooks_published.Value.ToString("yyyy-MM-dd")); // Format date appropriately
+                            cmd.Parameters.AddWithValue("@status", addBooks_status.Text.Trim());
+                            cmd.Parameters.AddWithValue("@dateUpdate", today);
+                            cmd.Parameters.AddWithValue("@id", bookID);
+
+                            cmd.ExecuteNonQuery();
+
+                            displayBooks();
+
+                            MessageBox.Show("Update successful", "Information Message", MessageBoxButtons.OK, MessageBoxIcon.Information);
+
+                            clearFields();
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        MessageBox.Show("Error: " + ex.Message, "Error Message", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    }
+                    finally
+                    {
+                        connect.Close();
+                    }
+                }
+                else
+                {
+                    MessageBox.Show("Cancelled.", "Information Message", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                }
+            }
+        }
+
+    
+
+        private void deleteBooksbtn_Click(object sender, EventArgs e)
+        {
+            if (bookID == 0)
+            {
+                MessageBox.Show("Please select an item to delete", "Error Message", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return;
+            }
+
+            if (connect.State != ConnectionState.Open)
+            {
+                DialogResult check = MessageBox.Show("Are you sure you want to delete book id:" + bookID + "?", "Confirmation Message", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+                if (check == DialogResult.Yes)
+                {
+                    try
+                    {
+                        connect.Open();
+                        DateTime today = DateTime.Today;
+
+                        // Ensure the column names are correct
+                        string updateData = "UPDATE books SET date_delete = @dateDelete WHERE id = @id";
+
+                        using (SqlCommand cmd = new SqlCommand(updateData, connect))
+                        {
+                            cmd.Parameters.AddWithValue("@dateDelete", today);
+                            cmd.Parameters.AddWithValue("@id", bookID);
+
+                            cmd.ExecuteNonQuery();
+
+                            displayBooks();
+
+                            MessageBox.Show("Delete successful", "Information Message", MessageBoxButtons.OK, MessageBoxIcon.Information);
+
+                            clearFields();
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        MessageBox.Show("Error: " + ex.Message, "Error Message", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    }
+                    finally
+                    {
+                        connect.Close();
+                    }
+                }
+                else
+                {
+                    MessageBox.Show("Cancelled.", "Information Message", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                }
+            }
+        }
+
+        private void dataGridView1_CellClick(object sender, DataGridViewCellEventArgs e)
+        {
+            if (e.RowIndex != -1)
+            {
+                DataGridViewRow row = dataGridView1.Rows[e.RowIndex];
+                bookID = (int)row.Cells[0].Value;
+                addBooks_bookTitle.Text = row.Cells[1].Value.ToString();
+                addBooks_author.Text = row.Cells[2].Value.ToString();
+                addBooks_published.Text = row.Cells[3].Value.ToString();
+
+                string imagePath = row.Cells[4].Value.ToString();
+                if (!string.IsNullOrEmpty(imagePath) && File.Exists(imagePath))
+                {
+                    addbooks_picture.Image = Image.FromFile(imagePath);
+                }
+                else
+                {
+                    addbooks_picture.Image = null; // or set to a default image
+                    MessageBox.Show("Image not found: " + imagePath, "Error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                }
+                addBooks_status.Text = row.Cells[5].Value.ToString();
+            }
+        }
+
+        private void clearBooksbtn_Click(object sender, EventArgs e)
+        {
+            clearFields();
+        }
+     }      
+  }
+  
+
+
+
+
+    
