@@ -1,0 +1,139 @@
+﻿using System;
+using System.Collections.Generic;
+using System.ComponentModel;
+using System.Drawing;
+using System.Data;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+using System.Windows.Forms;
+using System.Data.SqlClient;
+using System.Data;
+
+namespace WindowsFormsApplication1
+{
+    public partial class ReturnBooks : UserControl
+    {
+
+        SqlConnection connect = new SqlConnection(@"Data Source=(LocalDB)\MSSQLLocalDB;AttachDbFilename=C:\2252\WindowsFormsApplication1\lms.mdf;Integrated Security=True;Connect Timeout=30");
+
+        public ReturnBooks()
+        {
+            InitializeComponent();
+
+            displayIsssueBookData();
+
+           
+        }
+
+        public void refreshData()
+        {
+            if(InvokeRequired)
+            {
+                Invoke((MethodInvoker)refreshData);
+                return;
+            }
+            displayIsssueBookData();
+        }
+
+        private void returnBooks_returnbtn_Click(object sender, EventArgs e)
+        {
+            if (returnBooks_issueID.Text == ""
+                 || returnBooks_name.Text == ""
+                 || returnBooks_contact.Text == ""
+                 || returnBooks_email.Text == ""
+                 || returnBooks_bookTitle.Text == ""
+                 || returnBooks_author.Text == ""
+                 || bookIssue_returnDate.Value == null)
+            {
+                MessageBox.Show("pelase select item first", "Error Mesaage", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+            else
+            {
+                if (connect.State == ConnectionState.Closed)
+                {
+
+                    DialogResult check = MessageBox.Show("Are you sure that Issue ID:"
+                        + returnBooks_issueID.Text.Trim() + "is return already?", "Confirmation Message", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+
+                    if (check == DialogResult.Yes)
+                    {
+                        try
+                        {
+                            connect.Open();
+
+
+                            string updateData = "update issue set status=@status,date_update=@dateUpdate " +
+                                "where issue_id=@issueID";
+
+                            using (SqlCommand cmd = new SqlCommand(updateData, connect))
+                            {
+                                cmd.Parameters.AddWithValue("@status", "Return");
+                                cmd.Parameters.AddWithValue("@dateUpdate", DateTime.Now);
+                                cmd.Parameters.AddWithValue("@issueID", returnBooks_issueID.Text.Trim());
+
+                                cmd.ExecuteNonQuery();
+
+                                displayIsssueBookData();
+
+                                MessageBox.Show("Returned successfully!","Information Message", MessageBoxButtons.OK, MessageBoxIcon.Information);
+
+
+                                clearFields();
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            MessageBox.Show("Error:" + ex, "Error Message", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                        }
+                        finally
+                        {
+                            connect.Close();
+                        }
+                    }
+                }
+            }
+        }
+               
+
+        public void displayIsssueBookData()
+        {
+            DataIssueBook dib = new DataIssueBook();
+            List<DataIssueBook> listData = dib.IssueBookData();
+
+            dataGridView2.DataSource = listData;
+
+        }
+
+        private void dataGridView2_CellClick(object sender, DataGridViewCellEventArgs e)
+        {
+            if (e.RowIndex != -1)
+            {
+                DataGridViewRow row = dataGridView2.Rows[e.RowIndex];
+                returnBooks_issueID.Text = row.Cells[1].Value.ToString();
+                returnBooks_name.Text = row.Cells[2].Value.ToString();
+                returnBooks_contact.Text = row.Cells[3].Value.ToString();
+                returnBooks_email.Text = row.Cells[4].Value.ToString();
+                returnBooks_bookTitle.Text = row.Cells[5].Value.ToString();
+                returnBooks_author.Text = row.Cells[6].Value.ToString();
+                bookIssue_returnDate.Text = row.Cells[9].Value.ToString();
+            }
+        }
+
+        public void clearFields()
+        {
+            returnBooks_issueID.Text = "";
+            returnBooks_name.Text = "";
+            returnBooks_contact.Text = "";
+            returnBooks_email.Text = "";
+            returnBooks_bookTitle.Text = "";
+            returnBooks_author.Text = "";
+
+        }
+
+        private void returnBooks_clearbtn_Click(object sender, EventArgs e)
+        {
+            clearFields();
+        }
+    }
+}
